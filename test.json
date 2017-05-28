@@ -1,0 +1,34 @@
+{
+	"Window" : {
+		"width":  1200,
+		"height": 900
+	},
+	"Textures" : [
+		{"name": "container", "type": "2D", "source": "F:/Projects/LearnOpenGL/LearnOpenGL/textures/container.jpg"},
+		{"name": "skybox", "type": "CubeMap", "source": "F:/Projects/LearnOpenGL/LearnOpenGL/textures/skybox"}
+	],
+	"Programs" : [
+		{"name":"lighting", "root": "F:/Projects/LearnOpenGL/LearnOpenGL/shaders", "shaders": "light.vs;light.fs"}
+	],
+	"SetStateCallbacks" : {
+		"library" : "F:/Projects/GfxLab/build/statecbs/RelWithDebInfo/StateCbs.dll"
+	},
+	"Scene" : {
+		"Camera" : {
+			"pos"  : [0.0, 0.0, 5.0],
+			"focus": [0.0, 0.0, 0.0],
+			"up"   : [0.0, 1.0, 0.0]
+		},
+		"Lights" : [
+			{"pos" : [0, 0, 5], "type": "Point"},
+			{"pos" : [0, 0, -5], "type": "Point", "diffuse": [0.9, 0.1, 0.1], "linear_attn": 0.5}
+		],
+		"DefaultProgram": "lighting",
+		"Geometries" : [
+      {
+        "name"  : "cube",
+        "source": "F:/Projects/LearnOpenGL/LearnOpenGL/models/cube.obj"
+      }
+		]
+	}
+}
