@@ -5,6 +5,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+float Camera::STEP_SIZE = 0.1f;
 
 Camera::Camera(int x, int y, int viewWidth, int viewHeight)
 	: _viewWidth(viewWidth),
@@ -30,18 +31,18 @@ void Camera::LookAt(const glm::vec3& pos, const glm::vec3& focus, const glm::vec
 }
 
 
-void Camera::BeginMove()
+void Camera::BeginRotate()
 {
 	_moveType = ROTATE;
 }
 
-void Camera::StopMove()
+void Camera::StopRotate()
 {
 	_moveType = NONE;
 	_lastTrackballPosSet = false;
 }
 
-void Camera::Move(float x, float y)
+void Camera::Rotate(float x, float y)
 {
 	if (_moveType == ROTATE) {
 		glm::vec3 curTrackballPos = MapToTrackball(x, y);
@@ -56,6 +57,30 @@ void Camera::Move(float x, float y)
 			_lastTrackballPosSet = true;
 		_lastTrackballPos = curTrackballPos;
 	}
+}
+
+void Camera::MoveForward()
+{
+	_position.z -= STEP_SIZE;
+	_view = glm::lookAt(_position, glm::vec3(0, 0, 0), _up);
+}
+
+void Camera::MoveBackward()
+{
+	_position.z += STEP_SIZE;
+	_view = glm::lookAt(_position, glm::vec3(0, 0, 0), _up);
+}
+
+void Camera::MoveLeft()
+{
+	_position.x -= STEP_SIZE;
+	_view = glm::lookAt(_position, glm::vec3(0, 0, 0), _up);
+}
+
+void Camera::MoveRight()
+{
+	_position.x += STEP_SIZE;
+	_view = glm::lookAt(_position, glm::vec3(0, 0, 0), _up);
 }
 
 void Camera::Zoom(float change)

@@ -40,6 +40,7 @@ Window::Window(const char* title, int width, int height)
 	glfwMakeContextCurrent(_glfwWindow);
 	glfwSetCursorPosCallback(_glfwWindow, &(Window::cursor_position_callback));
 	glfwSetScrollCallback(_glfwWindow, &(Window::scroll_callback));
+	glfwSetKeyCallback(_glfwWindow, &(Window::key_callback));
 	glfwSetMouseButtonCallback(_glfwWindow, &(Window::mouse_button_callback));
 	glfwSetWindowSizeCallback(_glfwWindow, &(Window::window_size_callback));
 	glfwSetInputMode(_glfwWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -78,7 +79,7 @@ void Window::cursor_position_callback(GLFWwindow* window, double xpos, double yp
 	if (_window->_renderer != nullptr) {
 		_activeCamera = _window->_renderer->GetCamera();
 		if (_activeCamera != nullptr)
-			_activeCamera->Move(float(xpos), float(ypos));
+			_activeCamera->Rotate(float(xpos), float(ypos));
 	}
 	
 }
@@ -87,9 +88,29 @@ void Window::mouse_button_callback(GLFWwindow* window, int button, int action, i
 {
 	if (button == GLFW_MOUSE_BUTTON_LEFT && _activeCamera != nullptr) {
 		if (action == GLFW_PRESS)
-			_activeCamera->BeginMove();
+			_activeCamera->BeginRotate();
 		else if (action == GLFW_RELEASE)
-			_activeCamera->StopMove();
+			_activeCamera->StopRotate();
+	}
+}
+
+void Window::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	switch (key) {
+	case GLFW_KEY_A:
+		_activeCamera->MoveLeft();
+		break;
+	case GLFW_KEY_D:
+		_activeCamera->MoveRight();
+		break;
+	case GLFW_KEY_W:
+		_activeCamera->MoveForward();
+		break;
+	case GLFW_KEY_S:
+		_activeCamera->MoveBackward();
+		break;
+	default:
+		break;
 	}
 }
 

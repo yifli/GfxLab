@@ -8,9 +8,13 @@ public:
 	~Camera();
 
 	void             LookAt(const glm::vec3& pos, const glm::vec3& focus, const glm::vec3& up);
-	void             BeginMove();
-	void             Move(float x, float y);
-	void             StopMove();
+	void             BeginRotate();
+	void             Rotate(float x, float y);
+	void             StopRotate();
+	void             MoveForward();
+	void             MoveBackward();
+	void             MoveLeft();
+	void             MoveRight();
 	void             Zoom(float change);
 	void             Resize(int width, int height);
 	const glm::mat4& GetViewMatrix()                  const { return _view; }
@@ -29,6 +33,8 @@ private:
 		ROTATE,
 		ZOOM
 	};
+
+	static float  STEP_SIZE;
 
 	int           _viewWidth, _viewHeight;
 	int           _x, _y;
