@@ -4,6 +4,7 @@
 #include <SOIL.h>
 
 #include <cstdlib>
+#include <cassert>
 
 ResourceManager::ResourceManager()
 {
@@ -16,7 +17,7 @@ ResourceManager::ResourceManager()
 
 void ResourceManager::LoadMesh(const std::string& file, MeshPtr& pMesh)
 {
-	auto mesh = pMesh->GetMeshObj();
+	auto& mesh = pMesh->GetMeshObj();
 	mesh.request_vertex_normals();
 	mesh.request_vertex_texcoords2D();
 	mesh.request_vertex_colors();
@@ -138,7 +139,7 @@ GLuint ResourceManager::CreateProgram(std::vector<std::string>& shader_files)
 GLuint ResourceManager::CreateShader(const std::string& file)
 {
 	if (_shaders.find(file) == _shaders.end()) {
-		std::string suffix = file.substr(file.find(".")+1);
+		std::string suffix = file.substr(file.find_last_of(".")+1);
 		GLenum type;
 		if (suffix == "vs")
 			type = GL_VERTEX_SHADER;
@@ -146,6 +147,10 @@ GLuint ResourceManager::CreateShader(const std::string& file)
 			type = GL_FRAGMENT_SHADER;
 		else if (suffix == "gs")
 			type = GL_GEOMETRY_SHADER;
+		else {
+			fprintf(stderr, "unsupported shader file suffix %s\n", suffix);
+			assert(0);
+		}
 
 		std::string code;
 		std::ifstream shaderFile;

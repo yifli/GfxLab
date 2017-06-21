@@ -1,6 +1,5 @@
 LIBRARY StateCbs
 EXPORTS
    SetGlobalStates
-   SetPerFrameStates
    SetPerProgramStates
    SetPerGeometryStates

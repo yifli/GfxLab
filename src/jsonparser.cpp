@@ -20,13 +20,15 @@ static bool g_enable_logging = false;
 		fprintf(stdout, "[PARSER INFO]" fmt, ##__VA_ARGS__);
 
 #define LOGERR(fmt, ...) \
+{\
 	fprintf(stderr, "[PARSER ERROR]" fmt, ##__VA_ARGS__);\
-	assert(0);
+	assert(0);\
+}
 
 SceneParser::SceneParser()
 {
 	char* val = getenv("GFXLAB_ENABLE_PARSER_LOGGING");
-	if (atoi(val) == 1)
+	if (val && atoi(val) == 1)
 		g_enable_logging = true;
 	_resmanager = std::make_unique<ResourceManager>();
 }
@@ -44,9 +46,9 @@ void SceneParser::Parse(const char* file)
 		LOGINFO("Parsing attribute 'Window'...\n");
 		auto window = ParseWindow();
 		_renderer = ParseRenderer();
-		SetRenderStates();
 		ParseTextures();
 		ParsePrograms();
+		SetRenderStates();
 		auto scene = ParseScene();
 		if (scene != nullptr)
 			_renderer->SetScene(scene);
@@ -149,7 +151,7 @@ void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
 	for (auto& geom : geom_settings) {
 		GeometryPtr mesh = std::shared_ptr<Geometry>(new Mesh);
 		attib_full_name = "Scene.Geometries[" + std::to_string(geom_id) + "].";
-		ProcessStringAttrib(geom, "name", attib_full_name + "name", true, program);
+		ProcessStringAttrib(geom, "name", attib_full_name + "name", true, id);
 		mesh->SetName(id);
 
 		ProcessStringAttrib(geom, "source", attib_full_name+"source", true, source);
@@ -315,30 +317,26 @@ void SceneParser::ParseStateCallbacks()
 		else {
 			for (auto& str : global_state_cbs) {
 				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb == nullptr)
-					LOGERR("Failed to load symbol %s\n", str.c_str());
-				_renderer->AddGlobalSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(cb));
+				if (cb != nullptr)
+					_renderer->AddGlobalSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(cb));
 			}
 
 			for (auto& str : per_frame_cbs) {
 				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb == nullptr)
-					LOGERR("Failed to load symbol %s\n", str.c_str());
-				_renderer->AddFrameSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(cb));
+				if (cb != nullptr)
+					_renderer->AddFrameSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(cb));
 			}
 
 			for (auto& str : per_program_cbs) {
 				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb == nullptr)
-					LOGERR("Failed to load symbol %s\n", str.c_str());
-				_renderer->AddProgramSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, GLuint, RenderStates&, ProgramRenderStates&)>(cb));
+				if (cb != nullptr)
+					_renderer->AddProgramSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, GLuint, RenderStates&, ProgramRenderStates&)>(cb));
 			}
 
 			for (auto& str : per_geom_cbs) {
 				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb == nullptr)
-					LOGERR("Failed to load symbol %s\n", str.c_str());
-				_renderer->AddGeometrySetStateCallbacks(reinterpret_cast<void(*)(const GeometryPtr&, ProgramRenderStates&)>(cb));
+				if (cb != nullptr)
+					_renderer->AddGeometrySetStateCallbacks(reinterpret_cast<void(*)(const GeometryPtr&, ProgramRenderStates&)>(cb));
 			}
 		}
 		

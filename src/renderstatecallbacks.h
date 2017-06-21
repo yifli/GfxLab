@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 
+// data structures for communicating render states between main application and callback DLLs
 struct ProgramRenderStates {
 	std::unordered_map<std::string, GLuint>              uniform_locations;
 };
@@ -12,6 +13,8 @@ struct RenderStates {
 	std::unordered_map<GLuint, std::string>              reverse_program_lookup;
 };
 
+
+// callback type declarations used by main application
 using SetGlobalStateCallback      = std::function<void(const ScenePtr&, RenderStates&)>;
 using SetPerFrameStateCallback    = std::function<void(const ScenePtr&, RenderStates&)>;
 using SetPerProgramStateCallback  = std::function<void(const ScenePtr&, GLuint, RenderStates&, ProgramRenderStates&)>;
