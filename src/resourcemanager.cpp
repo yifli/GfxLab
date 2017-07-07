@@ -21,12 +21,25 @@ void ResourceManager::LoadMesh(const std::string& file, MeshPtr& pMesh)
 	mesh.request_vertex_normals();
 	mesh.request_vertex_texcoords2D();
 	mesh.request_vertex_colors();
+	mesh.request_face_colors();
+	mesh.request_vertex_status();
+	mesh.request_edge_status();
+	mesh.request_face_status();
+	mesh.request_halfedge_status();
 
 	OpenMesh::IO::Options opt;
 	opt += OpenMesh::IO::Options::VertexNormal;
 	opt += OpenMesh::IO::Options::VertexTexCoord;
 	opt += OpenMesh::IO::Options::VertexColor;
+	opt += OpenMesh::IO::Options::FaceColor;
 	assert(OpenMesh::IO::read_mesh(mesh, file, opt));
+
+	pMesh->DeleteIsolatedVerts();
+
+	mesh.release_vertex_status();
+	mesh.release_edge_status();
+	mesh.release_face_status();
+	mesh.release_halfedge_status();
 
 	if (!opt.check(OpenMesh::IO::Options::VertexNormal)) {
 		mesh.request_face_normals();
@@ -40,6 +53,10 @@ void ResourceManager::LoadMesh(const std::string& file, MeshPtr& pMesh)
 	if (!opt.check(OpenMesh::IO::Options::VertexColor))
 		mesh.release_vertex_colors();
 
+	if (opt.check(OpenMesh::IO::Options::FaceColor))
+		pMesh->EnablePerFaceShading(true);
+	else
+		mesh.release_face_colors();
 
 	if (_vertex_array_objs.find(file) == _vertex_array_objs.end()) {
 		pMesh->SetupVAO();
@@ -148,7 +165,7 @@ GLuint ResourceManager::CreateShader(const std::string& file)
 		else if (suffix == "gs")
 			type = GL_GEOMETRY_SHADER;
 		else {
-			fprintf(stderr, "unsupported shader file suffix %s\n", suffix);
+			fprintf(stderr, "unsupported shader file suffix %s\n", suffix.c_str());
 			assert(0);
 		}
 

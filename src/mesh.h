@@ -22,19 +22,28 @@ class Mesh : public Geometry {
 	};
 
 public:
-	TriMesh&         GetMeshObj() { return _mesh; }
+	Mesh() : _per_face_shading(false) {}
+
+	TriMesh&         GetMeshObj()                       { return _mesh; }
+	void             EnablePerFaceShading(bool enable);
 	virtual void     Render();
 
 private:
-	void ComputeBoundingBox();
-	void SetInitialTransformation();
-	void SetupVAO();
-	void PopulateVBO(VBOInfo&);
-	void PopulateIBO();
+	void     ComputeBoundingBox();
+	void     SetInitialTransformation();
+	void     SetupVAO();
+	void     PopulateVBO(VBOInfo&);
+	void     CalculateVBOSize(VBOInfo&);
+	void     PopulateVBOData(VBOInfo&);
+	void     PopulateVertexData(const TriMesh::HalfedgeHandle& hh, char* data, const VBOInfo&);
+	void     PopulateIBO(const TriMesh::HalfedgeHandle&, int);
+	bool     VertexHasColorAttrib();
+	void     DeleteIsolatedVerts();
 
 private:
 	TriMesh             _mesh;
 	std::vector<GLuint> _indices;
+	bool                _per_face_shading;
 };
 
 
