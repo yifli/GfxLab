@@ -91,7 +91,7 @@ void Mesh::SetupVAO()
 
 	if (VertexHasColorAttrib()) {
 		glEnableVertexAttribArray(index);
-		glVertexAttribPointer(index, 3, GL_UNSIGNED_BYTE, GL_FALSE, info.vertex_size, (GLvoid*)(info.color_offset));
+		glVertexAttribPointer(index, 3, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)(info.color_offset));
 		index++;
 	}
 
@@ -119,7 +119,9 @@ void Mesh::CalculateVBOSize(VBOInfo& info)
 
 	if (VertexHasColorAttrib()) {
 		info.color_offset = vertex_size;
-		vertex_size += sizeof(TriMesh::Color);
+		// TriMesh::Color is a unsigned char array of 3 elements
+		// we convert it into a float array 
+		vertex_size += 3 * sizeof(float);
 	}
 
 	if (_mesh.has_vertex_texcoords2D()) {
@@ -208,7 +210,10 @@ void Mesh::PopulateVertexData(const TriMesh::HalfedgeHandle& hh, char* data, con
 		}
 		else
 			color = _mesh.color(vh);
-		memcpy(data+info.color_offset, color.data(), sizeof(TriMesh::Color));
+		float f_color[3];
+		for (int i = 0; i < 3; i++)
+			f_color[i] = float((unsigned)color[i]) / 255.0f;
+		memcpy(data+info.color_offset, f_color, sizeof(f_color));
 	}
 
 	if (_mesh.has_vertex_texcoords2D()) {
