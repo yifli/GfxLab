@@ -9,6 +9,9 @@
 #include <Windows.h>
 #endif
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include <fstream>
 #include <iostream>
 #include <cctype>
@@ -33,9 +36,64 @@ SceneParser::SceneParser()
 	_resmanager = std::make_unique<ResourceManager>();
 }
 
+void SceneParser::SetResourceLocations()
+{
+	char* evar = getenv("GFXLAB_ROOT");
+	_gfxlab_root = evar == NULL ?  "" : std::string(evar);
+
+	evar = getenv("GFXLAB_MODEL_FOLDER");
+	_gfxlab_model_dir = evar == NULL ? "" : std::string(evar);
+
+	evar = getenv("GFXLAB_SHADER_FOLDER");
+	_gfxlab_shader_dir = evar == NULL ? "" : std::string(evar);
+
+	evar = getenv("GFXLAB_BIN_FOLDER");
+	_gfxlab_bin_dir = evar == NULL ? "" : std::string(evar);
+
+	evar = getenv("GFXLAB_CONFIG_FOLDER");
+	_gfxlab_config_dir = evar == NULL ? "" : std::string(evar);
+
+	if (_gfxlab_root.empty())
+		_gfxlab_root = "./";
+	else if (!ValidFolder(_gfxlab_root)) {
+		std::cerr << "GFXLAB_ROOT " << _gfxlab_root << " does not exist\n";
+		assert(0);
+	}
+
+	if (_gfxlab_model_dir.empty())
+		_gfxlab_model_dir = _gfxlab_root + "/models/";
+	if (!ValidFolder(_gfxlab_model_dir)) {
+			std::cerr << "GFXLAB_MODEL_FOLDER " << _gfxlab_model_dir << " dos not exist\n";
+			assert(0);
+	}
+
+	if (_gfxlab_shader_dir.empty())
+		_gfxlab_shader_dir = _gfxlab_root + "/shaders/";
+	if (!ValidFolder(_gfxlab_shader_dir)) {
+		std::cerr << "GFXLAB_SHADER_FOLDER " << _gfxlab_shader_dir << " dos not exist\n";
+		assert(0);
+	}
+
+	if (_gfxlab_bin_dir.empty())
+		_gfxlab_bin_dir = _gfxlab_root + "/bin/";
+	if (!ValidFolder(_gfxlab_bin_dir)) {
+		std::cerr << "GFXLAB_BIN_FOLDER " << _gfxlab_bin_dir << " dos not exist\n";
+		assert(0);
+	}
+
+	if (_gfxlab_config_dir.empty())
+		_gfxlab_config_dir = _gfxlab_root + "/configs/";
+	if (!ValidFolder(_gfxlab_model_dir)) {
+		std::cerr << "GFXLAB_CONFIG_FOLDER " << _gfxlab_config_dir << " dos not exist\n";
+		assert(0);
+	}
+}
+
 void SceneParser::Parse(const char* file)
 {
-	std::ifstream input(file);
+	SetResourceLocations();
+
+	std::ifstream input(_gfxlab_config_dir+"/"+file);
 	if (!input.is_open()) {
 		std::cout << "failed to open " << file << std::endl;
 		std::exit(-1);
@@ -155,6 +213,7 @@ void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
 		mesh->SetName(id);
 
 		ProcessStringAttrib(geom, "source", attib_full_name+"source", true, source);
+		source = _gfxlab_model_dir + "/" + source;
 		_resmanager->LoadMesh(source, std::static_pointer_cast<Mesh>(mesh));
 
 		ProcessStringAttrib(geom, "program", attib_full_name + "program", false, program);
@@ -262,26 +321,24 @@ void SceneParser::ParsePrograms()
 	if (_j.find("Programs") != _j.end()) {
 		if (_j["Programs"].is_array()) {
 			auto programs = _j["Programs"];
-			std::string prog_name, root_folder, shaders;
+			std::string prog_name, shaders;
 			int prog_id = 0;
-			root_folder = ".";
 			for (auto& prog : programs) {
 				std::string attrib_full_name = "Programs[" + std::to_string(prog_id) + "].";
 				ProcessStringAttrib(prog, "name", attrib_full_name + "name", true, prog_name);
 				ProcessStringAttrib(prog, "shaders", attrib_full_name + "shaders", true, shaders);
-				ProcessStringAttrib(prog, "root", attrib_full_name + "root", true, root_folder);
 				++prog_id;
 
 				std::vector<std::string> shader_files;
 				size_t prev = 0, next;
 				while ((next = shaders.find_first_of(";", prev)) != std::string::npos) {
-					shader_files.push_back(root_folder + "/" + shaders.substr(prev, next - prev));
+					shader_files.push_back(_gfxlab_shader_dir + "/" + shaders.substr(prev, next - prev));
 					next++;
 					while (std::isspace(shaders[next]))
 						next++;
 					prev = next;
 				}
-				shader_files.push_back(root_folder + "/" + shaders.substr(prev));
+				shader_files.push_back(_gfxlab_shader_dir + "/" + shaders.substr(prev));
 				_programs[prog_name] = _resmanager->CreateProgram(shader_files);
 			}
 		}
@@ -299,6 +356,7 @@ void SceneParser::ParseStateCallbacks()
 		auto callback_settings = _j["SetStateCallbacks"];
 		std::string library;
 		ProcessStringAttrib(callback_settings, "library", "SetStateCallbacks.library", true, library);
+		library = _gfxlab_bin_dir + "/" + library;
 
 		std::vector<std::string> global_state_cbs = { "SetGlobalStates"      };
 		std::vector<std::string> per_frame_cbs    = { "SetPerFrameStates"    };
@@ -442,5 +500,11 @@ void SceneParser::ProcessStringArrayAttrib(const json& j, const std::string& nam
 		if (required)
 			LOGERR("Missing attribute '%s'\n", full_name.c_str());
 	}
+}
+
+bool SceneParser::ValidFolder(const std::string& folder)
+{
+	struct stat sb;
+	return stat(folder.c_str(), &sb) == 0 && (sb.st_mode & S_IFDIR);
 }
 

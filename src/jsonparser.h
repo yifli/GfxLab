@@ -13,6 +13,7 @@ public:
 	void Parse(const char* file);
 
 private:
+	void        SetResourceLocations();
 	WindowPtr   ParseWindow();
 	ScenePtr    ParseScene();
 	void        ParseCamera(ScenePtr, const json&);
@@ -29,6 +30,7 @@ private:
 	void        ProcessStringAttrib(const json&, const std::string&, const std::string&, bool, std::string&);
 	void        ProcessNumberArrayAttrib(const json&, const std::string&, const std::string&, bool, std::vector<float>&);
 	void        ProcessStringArrayAttrib(const json&, const std::string&, const std::string&, bool, std::vector<std::string>&);
+	bool        ValidFolder(const std::string&);
 
 	json                                    _j;
 	int                                     _width, _height;
@@ -37,4 +39,9 @@ private:
 	std::unordered_map<std::string, GLuint> _textures;
 	std::unordered_map<std::string, GLuint> _programs;
 	GLuint                                  _default_program;
+	std::string                             _gfxlab_root;
+	std::string                             _gfxlab_bin_dir;
+	std::string                             _gfxlab_shader_dir;
+	std::string                             _gfxlab_model_dir;
+	std::string                             _gfxlab_config_dir;
 };

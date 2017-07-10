@@ -1,0 +1,5 @@
+LIBRARY NoLighting
+EXPORTS
+   SetGlobalStates
+   SetPerProgramStates
+   SetPerGeometryStates

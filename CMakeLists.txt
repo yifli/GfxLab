@@ -16,8 +16,11 @@ else()
 	set(OpenMeshLib OpenMeshCore)
 endif()
 
-add_executable(gfxlab ${SRCS} ${HEADERS})
-target_link_libraries(gfxlab glfw3 SOIL ${OpenMeshLib} glew32s)
+set(TARGET_NAME gfxlab)
+add_executable(${TARGET_NAME} ${SRCS} ${HEADERS})
+target_link_libraries(${TARGET_NAME} glfw3 SOIL ${OpenMeshLib} glew32s)
+add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${TARGET_NAME}> ${CMAKE_SOURCE_DIR}/bin)
 
 if (WIN32)
 	target_link_libraries(gfxlab opengl32)
@@ -27,4 +30,5 @@ if (MSVC)
 	source_group("Headers" FILES ${HEADERS})
 endif()
 
-add_subdirectory(statecbs)
+add_subdirectory(statecallbacks/nolight)
+add_subdirectory(statecallbacks/lighting)
