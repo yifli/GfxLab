@@ -112,6 +112,10 @@ void Window::key_callback(GLFWwindow* window, int key, int scancode, int action,
 	default:
 		break;
 	}
+
+	if (_window->_renderer)
+		_window->_renderer->OnKeyPressed(key, scancode, action, mods);
+
 }
 
 void Window::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)

@@ -1,4 +1,5 @@
 #include "jsonparser.h"
+#include "rendererfactory.h"
 #include <iostream>
 
 int main(int argc, char** argv)
@@ -8,6 +9,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
+	RendererFactory::Init();
 	SceneParser parser;
 	parser.Parse(argv[1]);
 

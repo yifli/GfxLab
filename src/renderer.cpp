@@ -2,6 +2,12 @@
 #include "scene.h"
 #include "geometry.h"
 #include "camera.h"
+#include "rendererfactory.h"
+
+Renderer::Renderer()
+{
+	RendererFactory::RegisterRenderer<Renderer>("Default");
+}
 
 void Renderer::Initialize()
 {
@@ -13,14 +19,6 @@ void Renderer::Initialize()
 	for (auto& cb : _globalCallbacks) {
 		cb(_scene, _renderStates);
 	}
-}
-
-CameraPtr Renderer::GetCamera()
-{
-	if (_scene != nullptr)
-		return _scene->GetCamera();
-	else
-		return nullptr;
 }
 
 void Renderer::Render()

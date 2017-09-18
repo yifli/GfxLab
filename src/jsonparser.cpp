@@ -4,6 +4,7 @@
 #include "camera.h"
 #include "light.h"
 #include "mesh.h"
+#include "rendererfactory.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -286,7 +287,17 @@ void SceneParser::ParseLights(ScenePtr scene, const json& light_settings)
 
 RendererPtr SceneParser::ParseRenderer()
 {
-	return std::make_shared<Renderer>();
+	LOGINFO("Parsing attribute 'Renderer'...\n");
+
+	std::string renderer_name = "default";
+	if (_j.find("Renderer") == _j.end()) {
+		LOGINFO("Use default renderer since Renderer is not set.\n");
+	}
+	else {
+		ProcessStringAttrib(_j, "Renderer", "Renderer", true, renderer_name);
+	}
+	
+	return RendererFactory::MakeRenderer(renderer_name);
 }
 
 void SceneParser::ParseTextures()

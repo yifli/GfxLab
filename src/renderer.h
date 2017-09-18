@@ -9,20 +9,34 @@
 
 class Renderer {
 public:
+	Renderer();
+
 	void      SetScene(ScenePtr scene)                                     { _scene = scene; }
-	void      Initialize();
-	void      Render();
-	void      Resize(int width, int height);
-	CameraPtr GetCamera();
 	void      AddGlobalSetStateCallbacks(SetGlobalStateCallback cb)        { _globalCallbacks.push_back(cb); }
 	void      AddFrameSetStateCallbacks(SetPerFrameStateCallback cb)       { _perFrameCallbacks.push_back(cb); }
 	void      AddProgramSetStateCallbacks(SetPerProgramStateCallback cb)   { _perProgramCallbacks.push_back(cb); }
 	void      AddGeometrySetStateCallbacks(SetPerGeometryStateCallback cb) { _perGeometryCallbacks.push_back(cb); }
-	void      AddShaderProgram(const std::string name, GLuint id)          { _renderStates.programs[name] = id;
-	                                                                         _renderStates.reverse_program_lookup[id] = name;
-	                                                                       }
+	void      AddShaderProgram(const std::string name, GLuint id)
+	{
+		_renderStates.programs[name] = id;
+		_renderStates.reverse_program_lookup[id] = name;
+	}
+	CameraPtr GetCamera()
+	{
+		if (_scene != nullptr)
+			return _scene->GetCamera();
+		else
+			return nullptr;
+	}
 
-private:
+
+	virtual void      Initialize();
+	virtual void      Render();
+	virtual void      Resize(int width, int height);
+	virtual void      OnKeyPressed(int key, int scancode, int action, int mods) {}
+
+
+protected:
 	ScenePtr                                              _scene;
 	std::unordered_map<GLuint, std::vector<GeometryPtr>>  _geometriesByProgram;
 	std::vector<SetGlobalStateCallback>                   _globalCallbacks;
