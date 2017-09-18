@@ -1,7 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR}/src)
 set(TARGET_NAME NoLighting)
 
-add_library(${TARGET_NAME} SHARED nolight_statecbs.cpp init.cpp statecbs.def)
+add_library(${TARGET_NAME} SHARED nolight_statecbs.cpp ../init.cpp statecbs.def)
 target_link_libraries(${TARGET_NAME} glew32s opengl32)
 
 add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
