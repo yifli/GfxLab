@@ -157,14 +157,6 @@ ScenePtr SceneParser::ParseScene()
 					LOGERR("Expects a JSON object for the attribute Scene.Camera\n");
 			}
 
-			
-			std::string progName;
-			ProcessStringAttrib(scene_object, "DefaultProgram", "Scene.DefaultProgram", true, progName);
-			if (_programs.find(progName) == _programs.end())
-				LOGERR("Failed to find program %s\n", progName.c_str());
-			_default_program = _programs[progName];
-		
-				
 			if (scene_object.find("Geometries") != scene_object.end()) {
 				if (scene_object["Geometries"].is_array())
 					ParseGeometries(scene, scene_object["Geometries"]);
@@ -369,44 +361,46 @@ void SceneParser::ParseStateCallbacks()
 		ProcessStringAttrib(callback_settings, "library", "SetStateCallbacks.library", true, library);
 		library = _gfxlab_bin_dir + "/" + library;
 
-		std::vector<std::string> global_state_cbs = { "SetGlobalStates"      };
-		std::vector<std::string> per_frame_cbs    = { "SetPerFrameStates"    };
-		std::vector<std::string> per_program_cbs  = { "SetPerProgramStates"  };
-		std::vector<std::string> per_geom_cbs     = { "SetPerGeometryStates" };
+		std::string global_state_cb;
+		std::string per_frame_cb;
+		std::string per_program_cb;
+		std::string per_geom_cb;
 
-		ProcessStringArrayAttrib(callback_settings, "global_state_cbs", "SetStateCallbacks.global_state_cbs", false, global_state_cbs);
-		ProcessStringArrayAttrib(callback_settings, "per_frame_cbs", "SetStateCallbacks.per_frame_cbs", false, per_frame_cbs);
-		ProcessStringArrayAttrib(callback_settings, "per_program_cbs", "SetStateCallbacks.per_program_cbs", false, per_program_cbs);
-		ProcessStringArrayAttrib(callback_settings, "per_geom_cbs", "SetStateCallbacks.per_geom_cbs", false, per_geom_cbs);
+		ProcessStringAttrib(callback_settings, "global_state_cbs", "SetStateCallbacks.global_state_cbs", false, global_state_cb);
+        if (global_state_cb.empty())
+            global_state_cb = "SetGlobalStates";
+		ProcessStringAttrib(callback_settings, "per_frame_cbs", "SetStateCallbacks.per_frame_cbs", false, per_frame_cb);
+        if (per_frame_cb.empty())
+            per_frame_cb = "SetPerFrameStates";
+		ProcessStringAttrib(callback_settings, "per_program_cbs", "SetStateCallbacks.per_program_cbs", false, per_program_cb);
+        if (per_program_cb.empty())
+            per_program_cb = "SetPerProgramStates";
+		ProcessStringAttrib(callback_settings, "per_geom_cbs", "SetStateCallbacks.per_geom_cbs", false, per_geom_cb);
+        if (per_geom_cb.empty())
+            per_geom_cb = "SetPerGeometryStates";
 
 		auto lib = LoadLibrary(library.c_str());
 		if (lib == nullptr) {
 			LOGERR("Failed to load library %s: %d\n", library.c_str(), GetLastError());
 		}
-		else {
-			for (auto& str : global_state_cbs) {
-				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb != nullptr)
-					_renderer->AddGlobalSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(cb));
-			}
+		else {            
+			auto state_cb = GetProcAddress(lib, global_state_cb.c_str());
+			if (state_cb != nullptr)
+				_renderer->SetGlobalSetStateCallback(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(state_cb));
 
-			for (auto& str : per_frame_cbs) {
-				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb != nullptr)
-					_renderer->AddFrameSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(cb));
-			}
+			
+			auto frame_cb = GetProcAddress(lib, per_frame_cb.c_str());
+			if (frame_cb != nullptr)
+				_renderer->SetFrameSetStateCallback(reinterpret_cast<void(*)(const ScenePtr&, RenderStates&)>(frame_cb));
+			
 
-			for (auto& str : per_program_cbs) {
-				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb != nullptr)
-					_renderer->AddProgramSetStateCallbacks(reinterpret_cast<void(*)(const ScenePtr&, GLuint, RenderStates&, ProgramRenderStates&)>(cb));
-			}
+			auto program_cb = GetProcAddress(lib, per_program_cb.c_str());
+			if (program_cb != nullptr)
+				_renderer->SetProgramSetStateCallback(reinterpret_cast<void(*)(const ScenePtr&, GLuint, RenderStates&, ProgramRenderStates&)>(program_cb));
 
-			for (auto& str : per_geom_cbs) {
-				auto cb = GetProcAddress(lib, str.c_str());
-				if (cb != nullptr)
-					_renderer->AddGeometrySetStateCallbacks(reinterpret_cast<void(*)(const GeometryPtr&, ProgramRenderStates&)>(cb));
-			}
+			auto geom_cb = GetProcAddress(lib, per_geom_cb.c_str());
+			if (geom_cb != nullptr)
+				_renderer->SetGeometrySetStateCallback(reinterpret_cast<void(*)(const GeometryPtr&, ProgramRenderStates&)>(geom_cb));
 		}
 		
 	}

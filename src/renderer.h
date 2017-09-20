@@ -8,14 +8,15 @@
 
 
 class Renderer {
+    friend class RenderPass;
 public:
 	Renderer();
 
-	void      SetScene(ScenePtr scene)                                     { _scene = scene; }
-	void      AddGlobalSetStateCallbacks(SetGlobalStateCallback cb)        { _globalCallbacks.push_back(cb); }
-	void      AddFrameSetStateCallbacks(SetPerFrameStateCallback cb)       { _perFrameCallbacks.push_back(cb); }
-	void      AddProgramSetStateCallbacks(SetPerProgramStateCallback cb)   { _perProgramCallbacks.push_back(cb); }
-	void      AddGeometrySetStateCallbacks(SetPerGeometryStateCallback cb) { _perGeometryCallbacks.push_back(cb); }
+	void      SetScene(ScenePtr scene)                                    { _scene = scene; }
+	void      SetGlobalSetStateCallback(SetGlobalStateCallback cb)        { _globalCallback = cb; }
+	void      SetFrameSetStateCallback(SetPerFrameStateCallback cb)       { _perFrameCallback = cb; }
+	void      SetProgramSetStateCallback(SetPerProgramStateCallback cb)   { _perProgramCallback = cb; }
+	void      SetGeometrySetStateCallback(SetPerGeometryStateCallback cb) { _perGeometryCallback = cb; }
 	void      AddShaderProgram(const std::string name, GLuint id)
 	{
 		_renderStates.programs[name] = id;
@@ -39,9 +40,9 @@ public:
 protected:
 	ScenePtr                                              _scene;
 	std::unordered_map<GLuint, std::vector<GeometryPtr>>  _geometriesByProgram;
-	std::vector<SetGlobalStateCallback>                   _globalCallbacks;
-	std::vector<SetPerFrameStateCallback>                 _perFrameCallbacks;
-	std::vector<SetPerProgramStateCallback>               _perProgramCallbacks;
-	std::vector<SetPerGeometryStateCallback>              _perGeometryCallbacks;
+	SetGlobalStateCallback                                _globalCallback;
+	SetPerFrameStateCallback                              _perFrameCallback;
+	SetPerProgramStateCallback                            _perProgramCallback;
+	SetPerGeometryStateCallback                           _perGeometryCallback;
 	RenderStates                                          _renderStates;
 };
