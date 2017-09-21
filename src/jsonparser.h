@@ -23,6 +23,7 @@ private:
 	void        ParseTextures();
 	void        ParsePrograms();
 	void        ParseStateCallbacks();
+    void        ParseRenderPass();
 	void        SetRenderStates();
 
 	void        ProcessFloatAttrib(const json&, const std::string&, const std::string&, bool, float&);
@@ -32,16 +33,16 @@ private:
 	void        ProcessStringArrayAttrib(const json&, const std::string&, const std::string&, bool, std::vector<std::string>&);
 	bool        ValidFolder(const std::string&);
 
-	json                                    _j;
-	int                                     _width, _height;
-	ResourcePtr                             _resmanager;
-	RendererPtr                             _renderer;
-	std::unordered_map<std::string, GLuint> _textures;
-	std::unordered_map<std::string, GLuint> _programs;
-	GLuint                                  _default_program;
-	std::string                             _gfxlab_root;
-	std::string                             _gfxlab_bin_dir;
-	std::string                             _gfxlab_shader_dir;
-	std::string                             _gfxlab_model_dir;
-	std::string                             _gfxlab_config_dir;
+	json                                         _j;
+	int                                          _width, _height;
+	ResourcePtr                                  _resmanager;
+	RendererPtr                                  _renderer;
+	std::unordered_map<std::string, GLuint>      _textures;
+	std::unordered_map<std::string, GLuint>      _programs;
+    std::unordered_map<std::string, GeometryPtr> _geometries;
+	std::string                                  _gfxlab_root;
+	std::string                                  _gfxlab_bin_dir;
+	std::string                                  _gfxlab_shader_dir;
+	std::string                                  _gfxlab_model_dir;
+	std::string                                  _gfxlab_config_dir;
 };

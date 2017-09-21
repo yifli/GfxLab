@@ -1,5 +1,6 @@
 #include "jsonparser.h"
 #include "rendererfactory.h"
+#include "renderpass.h"
 #include <iostream>
 
 int main(int argc, char** argv)

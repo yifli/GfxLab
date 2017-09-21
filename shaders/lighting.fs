@@ -11,9 +11,11 @@ uniform vec3 light_pos;
 
 void main()
 {
+	float ambient_strength = 0.1;
+	vec3 ambient = ambient_strength * light_color;
 	vec3 norm = normalize(frag_normal);
 	vec3 light_dir = normalize(light_pos - frag_pos);
 	float diff = max(dot(norm, light_dir), 0.0);
 	vec3 diffuse = diff * light_color;
-	frag_color = vec4(diffuse * obj_color, 1.0);
+	frag_color = vec4((ambient+diffuse) * obj_color, 1.0);
 }

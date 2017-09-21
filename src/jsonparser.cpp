@@ -5,6 +5,7 @@
 #include "light.h"
 #include "mesh.h"
 #include "rendererfactory.h"
+#include "renderpass.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -112,6 +113,7 @@ void SceneParser::Parse(const char* file)
 		if (scene != nullptr)
 			_renderer->SetScene(scene);
 		ParseStateCallbacks();
+        ParseRenderPass();
 		window->SetRenderer(_renderer);
 		window->Display();
 	}
@@ -209,15 +211,7 @@ void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
 		source = _gfxlab_model_dir + "/" + source;
 		_resmanager->LoadMesh(source, std::static_pointer_cast<Mesh>(mesh));
 
-		ProcessStringAttrib(geom, "program", attib_full_name + "program", false, program);
-		if (program.empty()) {
-			assert(_default_program > 0);
-			mesh->SetShaderProgram(_default_program);
-		}
-		else {
-			assert(_programs.find(program) != _programs.end() && _programs[program] > 0);
-			mesh->SetShaderProgram(_programs[program]);
-		}
+        _geometries[id] = mesh;
 		scene->AddGeometry(mesh);
 	}
 }
@@ -404,6 +398,83 @@ void SceneParser::ParseStateCallbacks()
 		}
 		
 	}
+}
+
+void SceneParser::ParseRenderPass()
+{
+    LOGINFO("Parsing attribute 'RenderPasses'...\n");
+
+    if (_j.find("RenderPasses") != _j.end()) {
+        if (_j["RenderPasses"].is_array()) {
+            auto render_passes = _j["RenderPasses"];
+            int rp_counter = 0;
+            for (auto& rp : render_passes) {
+                std::string attrib_full_name = "RenderPasses[" + std::to_string(rp_counter) + "]";
+
+                if (rp.is_array()) {
+                    std::string program;
+                    GLuint prog_id;
+                    std::vector<std::string> geometry_strings;
+                    int pair_counter = 0;
+                    for (auto& prog_geoms : rp) {
+                        attrib_full_name += "[" + std::to_string(pair_counter) + "].";
+                        ProcessStringAttrib(prog_geoms, "program", attrib_full_name + "program", true, program);
+                        ProcessStringArrayAttrib(prog_geoms, "geometries", attrib_full_name + "geometries", true, geometry_strings);
+
+                        prog_id = _programs[program];
+                        std::vector<GeometryPtr> geometries;
+                        for (auto& g_name : geometry_strings) {
+                            if (_geometries.find(g_name) == _geometries.end()) {
+                                LOGERR("Failed to find geometry '%s' in  %s\n", g_name.c_str(), (attrib_full_name + "geometries").c_str());
+                            }
+                            else {
+                                GeometryPtr geom = _geometries[g_name];
+                                geometries.push_back(geom);
+                            }
+                        }
+
+                        if (!_geometries.empty()) {
+                            RenderPassPtr render_pass = std::make_unique<RenderPass>(_renderer);
+                            render_pass->SetProgramForGeometries(prog_id, geometries);
+                            _renderer->AddRenderPass(std::move(render_pass));
+                        }
+                        else {
+                            LOGINFO("No geometries found for render pass %d\n", rp_counter);
+                        }
+
+                        pair_counter++;
+                    }
+                }
+                else {
+                    LOGERR("Expects a JSON array for the attribute RenderPasses[%d]\n", rp_counter);
+                }
+                rp_counter++;
+            }
+        }
+        else {
+            LOGERR("Expects a JSON array for the attribute 'RenderPasses'\n");
+        }
+    }
+    else {
+
+        if (_programs.empty())
+            LOGERR("Failed to create default render pass because no program is found\n");
+
+        GLuint prog_id = _programs.begin()->second;
+        std::vector<GeometryPtr> geometries;
+        for (auto& kv : _geometries)
+            geometries.push_back(kv.second);
+
+        if (!geometries.empty()) {
+            RenderPassPtr render_pass = std::make_unique<RenderPass>(_renderer);
+            render_pass->SetProgramForGeometries(prog_id, geometries);
+            _renderer->AddRenderPass(std::move(render_pass));
+        }
+        else {
+            LOGINFO("No geometries found for default render pass\n");
+        }
+    }
+
 }
 
 void SceneParser::SetRenderStates()

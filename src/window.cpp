@@ -1,6 +1,7 @@
 #include "window.h"
 #include "camera.h"
 #include "renderer.h"
+#include "renderpass.h"
 
 Window*           Window::_window = nullptr;
 CameraPtr         Window::_activeCamera = nullptr;

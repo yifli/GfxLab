@@ -7,23 +7,35 @@
     {
       "name": "lighting",
       "shaders": "lighting.vs;lighting.fs"
+    },
+
+    {
+      "name": "display_normal",
+      "shaders": "display_normal.vs;display_normal.gs;display_normal.fs"
     }
   ],
-  "SetStateCallbacks" : {
-		"library" : "lighting.dll"
-	},
-	"Scene" : {
-		"Camera" : {
-			"pos"  : [0.0, 0.0, 5.0],
-			"focus": [0.0, 0.0, 0.0],
-			"up"   : [0.0, 1.0, 0.0]
-		},
-		"DefaultProgram": "lighting",
-		"Geometries" : [
-			{
-				"name"  : "cube",
-				"source": "cube.obj"
-			}
-		]
-	}
+  "SetStateCallbacks": {
+    "library": "lighting.dll"
+  },
+  "Scene": {
+    "Camera": {
+      "pos": [ 0.0, 0.0, 5.0 ],
+      "focus": [ 0.0, 0.0, 0.0 ],
+      "up": [ 0.0, 1.0, 0.0 ]
+    },
+    "Geometries": [
+      {
+        "name": "cube",
+        "source": "cube.obj"
+      }
+    ]
+  },
+  "RenderPasses": [
+    [
+      { "program": "lighting", "geometries": [ "cube" ] }
+    ],
+    [
+      { "program": "display_normal", "geometries": [ "cube" ] }
+    ]
+  ]
 }

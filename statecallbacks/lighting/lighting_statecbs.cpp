@@ -10,10 +10,19 @@
 void SetGlobalStates(const ScenePtr& scene, RenderStates& rs)
 {
 	// find uniform locations
-	GLuint passthrough_prog = rs.programs["passthrough"];
-	rs.program_states[passthrough_prog].uniform_locations["model"] = glGetUniformLocation(passthrough_prog, "model");
-	rs.program_states[passthrough_prog].uniform_locations["view"] = glGetUniformLocation(passthrough_prog, "view");
-	rs.program_states[passthrough_prog].uniform_locations["projection"] = glGetUniformLocation(passthrough_prog, "projection");
+	GLuint prog = rs.programs["lighting"];
+	GLuint light_pos_loc = glGetUniformLocation(prog, "light_pos");
+	GLfloat pos[3] = { 0, 0, 4 };
+	glUniform3fv(light_pos_loc, 3, pos);
+
+	rs.program_states[prog].uniform_locations["model"] = glGetUniformLocation(prog, "model");
+	rs.program_states[prog].uniform_locations["view"] = glGetUniformLocation(prog, "view");
+	rs.program_states[prog].uniform_locations["projection"] = glGetUniformLocation(prog, "projection");
+
+    prog = rs.programs["display_normal"];
+    rs.program_states[prog].uniform_locations["model"] = glGetUniformLocation(prog, "model");
+    rs.program_states[prog].uniform_locations["view"] = glGetUniformLocation(prog, "view");
+    rs.program_states[prog].uniform_locations["projection"] = glGetUniformLocation(prog, "projection");
 }
 
 

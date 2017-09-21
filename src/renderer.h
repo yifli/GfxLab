@@ -13,6 +13,7 @@ public:
 	Renderer();
 
 	void      SetScene(ScenePtr scene)                                    { _scene = scene; }
+    void      AddRenderPass(RenderPassPtr renderpass)                     { _renderpasses.push_back(std::move(renderpass)); }
 	void      SetGlobalSetStateCallback(SetGlobalStateCallback cb)        { _globalCallback = cb; }
 	void      SetFrameSetStateCallback(SetPerFrameStateCallback cb)       { _perFrameCallback = cb; }
 	void      SetProgramSetStateCallback(SetPerProgramStateCallback cb)   { _perProgramCallback = cb; }
@@ -39,7 +40,7 @@ public:
 
 protected:
 	ScenePtr                                              _scene;
-	std::unordered_map<GLuint, std::vector<GeometryPtr>>  _geometriesByProgram;
+    std::vector<RenderPassPtr>                            _renderpasses;
 	SetGlobalStateCallback                                _globalCallback;
 	SetPerFrameStateCallback                              _perFrameCallback;
 	SetPerProgramStateCallback                            _perProgramCallback;
