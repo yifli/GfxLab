@@ -7,7 +7,7 @@
 
 Renderer::Renderer()
 {
-	RendererFactory::RegisterRenderer<Renderer>("Default");
+    RendererFactory::RegisterRenderer<Renderer>("Default");
 }
 
 void Renderer::Initialize()
@@ -18,7 +18,7 @@ void Renderer::Initialize()
 
 void Renderer::Render()
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     for (auto& rp : _renderpasses)
         rp->Render();
@@ -26,10 +26,8 @@ void Renderer::Render()
 
 void Renderer::Resize(int width, int height)
 {
-	glViewport(0, 0, width, height);
-	if (_scene != nullptr && _scene->GetCamera() != nullptr)
-		_scene->GetCamera()->Resize(width, height);
+    glViewport(0, 0, width, height);
+    if (_scene != nullptr && _scene->GetCamera() != nullptr)
+        _scene->GetCamera()->Resize(width, height);
 
 }
-
-
