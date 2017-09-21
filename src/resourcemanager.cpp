@@ -201,7 +201,7 @@ GLuint ResourceManager::CreateShader(const std::string& file)
 		if (!success)
 		{
 			glGetShaderInfoLog(shaderId, 512, NULL, infoLog);
-			std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+			std::cout << file << ": " << infoLog << std::endl;
 		}
 
 		_shaders[file] = std::unique_ptr<GLuint, decltype(_shader_deleter)>(new GLuint(shaderId), _shader_deleter);
