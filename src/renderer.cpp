@@ -13,6 +13,7 @@ Renderer::Renderer()
 void Renderer::Initialize()
 {
     _globalCallback(_scene, _renderStates);
+    glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::Render()
