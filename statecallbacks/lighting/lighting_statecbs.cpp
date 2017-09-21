@@ -11,9 +11,7 @@ void SetGlobalStates(const ScenePtr& scene, RenderStates& rs)
 {
 	// find uniform locations
 	GLuint prog = rs.programs["lighting"];
-	GLuint light_pos_loc = glGetUniformLocation(prog, "light_pos");
-	GLfloat pos[3] = { 0, 0, 4 };
-	glUniform3fv(light_pos_loc, 3, pos);
+	rs.program_states[prog].uniform_locations["light_pos"] = glGetUniformLocation(prog, "light_pos");
 
 	rs.program_states[prog].uniform_locations["model"] = glGetUniformLocation(prog, "model");
 	rs.program_states[prog].uniform_locations["view"] = glGetUniformLocation(prog, "view");
@@ -28,6 +26,10 @@ void SetGlobalStates(const ScenePtr& scene, RenderStates& rs)
 
 void SetPerProgramStates(const ScenePtr& scene, GLuint prog, RenderStates& rs, ProgramRenderStates& prog_rs)
 {
+    if (rs.reverse_program_lookup[prog] == "lighting") {
+        GLfloat pos[3] = { 0, 0, 10 };
+        glUniform3fv(rs.program_states[prog].uniform_locations["light_pos"], 1, pos);
+    }
 	glUniformMatrix4fv(rs.program_states[prog].uniform_locations["view"], 1, GL_FALSE, glm::value_ptr(scene->GetCamera()->GetViewMatrix()));
 	glUniformMatrix4fv(rs.program_states[prog].uniform_locations["projection"], 1, GL_FALSE, glm::value_ptr(scene->GetCamera()->GetProjectionMatrix()));
 }

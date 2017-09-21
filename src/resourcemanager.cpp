@@ -41,11 +41,10 @@ void ResourceManager::LoadMesh(const std::string& file, MeshPtr& pMesh)
 	mesh.release_face_status();
 	mesh.release_halfedge_status();
 
-	if (!opt.check(OpenMesh::IO::Options::VertexNormal)) {
-		mesh.request_face_normals();
-		mesh.update_normals();
-		mesh.release_face_normals();
-	}
+
+	mesh.request_face_normals();
+	mesh.update_normals();
+	mesh.release_face_normals();
 
 	if (!opt.check(OpenMesh::IO::Options::VertexTexCoord))
 		mesh.release_vertex_texcoords2D();
