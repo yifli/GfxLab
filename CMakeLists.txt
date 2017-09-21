@@ -5,7 +5,7 @@ project(GfxLab)
 include_directories(${CMAKE_SOURCE_DIR}/external/include)
 link_directories(${CMAKE_SOURCE_DIR}/external/lib)
 
-add_definitions(-D_USE_MATH_DEFINES)
+add_definitions(-D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS)
 
 file(GLOB_RECURSE SRCS "./src/*.cpp")
 file(GLOB_RECURSE HEADERS "./src/*.h")
