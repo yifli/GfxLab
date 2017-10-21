@@ -6,12 +6,21 @@
 #include <cstdlib>
 #include <cassert>
 
+std::string ResourceManager::SCREEN_QUAD = "screen_quad";
+
+ResourceManager* ResourceManager::GetInstance()
+{
+    static ResourceManager manager;
+    return &manager;
+}
+
 ResourceManager::ResourceManager()
 {
-    _vao_deleter     = [](GLuint* id) { glDeleteVertexArrays(1, id); };
-    _texobj_deleter  = [](GLuint* id) { glDeleteTextures(1, id); };
-    _program_deleter = [](GLuint* id) { glDeleteProgram(*id); };
-    _shader_deleter  = [](GLuint* id) { glDeleteShader(*id); };
+    _vao_deleter          = [](GLuint* id) { glDeleteVertexArrays(1, id); };
+    _texobj_deleter       = [](GLuint* id) { glDeleteTextures(1, id); };
+    _program_deleter      = [](GLuint* id) { glDeleteProgram(*id); };
+    _shader_deleter       = [](GLuint* id) { glDeleteShader(*id); };
+    _renderbuffer_deleter = [](GLuint* id) { glDeleteRenderbuffers(1, id); };
 }
 
 
@@ -122,6 +131,37 @@ GLuint ResourceManager::LoadTexture(const std::string& type, const std::string& 
     return *(_texture_objs[path]);
 }
 
+GLuint  ResourceManager::CreateTexture(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLint format, GLenum type)
+{
+    GLuint texobj;
+    glGenTextures(1, &texobj);
+    auto pTex = std::unique_ptr<GLuint, decltype(_texobj_deleter)>(new GLuint(texobj), _texobj_deleter);
+    _fbo_textures.push_back(std::move(pTex));
+
+    glBindTexture(GL_TEXTURE_2D, texobj);
+    glTexImage2D(target, level, internalFormat, width, height, 0, format, type, 0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    return texobj;
+}
+
+GLuint  ResourceManager::CreateRenderBuffer(GLenum target, GLenum internalFormat, GLsizei width, GLsizei height)
+{
+    GLuint rbo;
+    glGenRenderbuffers(1, &rbo);
+    auto pRbo = std::unique_ptr<GLuint, decltype(_renderbuffer_deleter)>(new GLuint(rbo), _renderbuffer_deleter);
+    _fbo_renderbuffers.push_back(std::move(pRbo));
+
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(target, internalFormat, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+    return rbo;
+}
+
 
 GLuint ResourceManager::CreateProgram(std::vector<std::string>& shader_files)
 {
@@ -144,12 +184,19 @@ GLuint ResourceManager::CreateProgram(std::vector<std::string>& shader_files)
             GLchar infoLog[512];
             glGetProgramInfoLog(program, 512, NULL, infoLog);
             std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+            
+            glDeleteProgram(program);
+            program = 0;
+        }
+        else {
+            _programs[str] = std::unique_ptr<GLuint, decltype(_program_deleter)>(new GLuint(program), _program_deleter);
         }
 
-        _programs[str] = std::unique_ptr<GLuint, decltype(_program_deleter)>(new GLuint(program), _program_deleter);
+        return program;
     }
-
-    return *(_programs[str]);
+    else {
+        return *(_programs[str]);
+    }
 }
 
 GLuint ResourceManager::CreateShader(const std::string& file)
@@ -207,4 +254,38 @@ GLuint ResourceManager::CreateShader(const std::string& file)
     }
 
     return *(_shaders[file]);
+}
+
+GLuint  ResourceManager::GetScreenQuadVAO()
+{
+    if (_vertex_array_objs.find(SCREEN_QUAD) == _vertex_array_objs.end()) {
+        float quad_vertices[] = {
+            // positions   // texCoords
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  0.0f, 0.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+            1.0f,  1.0f,  1.0f, 1.0f
+        };
+
+        GLuint vao, vbo;
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), quad_vertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+        glBindVertexArray(0);
+
+        _vertex_array_objs[SCREEN_QUAD] = std::unique_ptr<GLuint, decltype(_vao_deleter)>(new GLuint(vao), _vao_deleter);
+        return vao;
+    }
+    else {
+        return *(_vertex_array_objs[SCREEN_QUAD]);
+    }
 }

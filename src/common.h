@@ -30,7 +30,7 @@ class Mesh;
 class RenderPass;
 class ResourceManager;
 
-using WindowPtr     = std::unique_ptr<Window>;
+using WindowPtr     = std::shared_ptr<Window>;
 using ScenePtr      = std::shared_ptr<Scene>;
 using RendererPtr   = std::shared_ptr<Renderer>;
 using CameraPtr     = std::shared_ptr<Camera>;

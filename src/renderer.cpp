@@ -5,23 +5,34 @@
 #include "rendererfactory.h"
 #include "renderpass.h"
 
+#include <unordered_set>
+
 Renderer::Renderer()
+    :_globalCallback(nullptr),
+    _perFrameCallback(nullptr),
+    _perProgramCallback(nullptr),
+    _perGeometryCallback(nullptr)
 {
     RendererFactory::RegisterRenderer<Renderer>("Default");
 }
 
 void Renderer::Initialize()
 {
-    _globalCallback(_scene, _renderStates);
-    glEnable(GL_DEPTH_TEST);
+    if (_globalCallback)
+        _globalCallback(_scene, _renderStates);
 }
 
 void Renderer::Render()
 {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    for (auto& rp : _renderpasses)
-        rp->Render();
+    std::unordered_set<GLuint> fbos;
+    bool needs_clear;
+    GLuint fbo;
+    for (auto& rp : _renderpasses) {
+        fbo = rp->GetFBO();
+        needs_clear = fbos.find(fbo) == fbos.end();
+        rp->Render(needs_clear);
+        fbos.insert(fbo);
+    }
 }
 
 void Renderer::Resize(int width, int height)

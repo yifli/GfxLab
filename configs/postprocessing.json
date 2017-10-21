@@ -1,0 +1,38 @@
+{
+  "Window": {
+    "width": 1200,
+    "height": 900
+  },
+
+  "Scene": {
+    "geometries": [
+      {
+        "name": "cube.obj",
+        "texture": "container2.png"
+      }
+    ]
+  },
+
+  "SetStateCallbacks": {
+    "library": "postprocessing.dll"
+  },
+
+  "RenderPasses": [
+    {
+      "program": {
+        "name":  "lightmap",
+        "shaders": "lightmap.vs;lightmap.fs"
+      },
+      "fbo": {
+        "color0": { }
+      }
+    },
+    {
+      "program": {
+        "name":  "inversion",
+        "shaders": "inversion.vs;inversion.fs"
+      },
+      "show_image":  "fbo0.color0"
+    }
+  ]
+}

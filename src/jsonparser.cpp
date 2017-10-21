@@ -17,6 +17,7 @@
 #include <fstream>
 #include <iostream>
 #include <cctype>
+#include <regex>
 
 static bool g_enable_logging = false;
 
@@ -35,7 +36,6 @@ SceneParser::SceneParser()
     char* val = getenv("GFXLAB_ENABLE_PARSER_LOGGING");
     if (val && atoi(val) == 1)
         g_enable_logging = true;
-    _resmanager = std::make_unique<ResourceManager>();
 }
 
 void SceneParser::SetResourceLocations()
@@ -54,6 +54,9 @@ void SceneParser::SetResourceLocations()
 
     evar = getenv("GFXLAB_CONFIG_FOLDER");
     _gfxlab_config_dir = evar == NULL ? "" : std::string(evar);
+
+    evar = getenv("GFXLAB_TEXTURE_FOLDER");
+    _gfxlab_texture_dir = evar == NULL ? "" : std::string(evar);
 
     if (_gfxlab_root.empty())
         _gfxlab_root = "./";
@@ -85,13 +88,20 @@ void SceneParser::SetResourceLocations()
 
     if (_gfxlab_config_dir.empty())
         _gfxlab_config_dir = _gfxlab_root + "/configs/";
-    if (!ValidFolder(_gfxlab_model_dir)) {
+    if (!ValidFolder(_gfxlab_config_dir)) {
         std::cerr << "GFXLAB_CONFIG_FOLDER " << _gfxlab_config_dir << " dos not exist\n";
+        assert(0);
+    }
+
+    if (_gfxlab_texture_dir.empty())
+        _gfxlab_texture_dir = _gfxlab_root + "/textures/";
+    if (!ValidFolder(_gfxlab_texture_dir)) {
+        std::cerr << "GFXLAB_TEXTURE_FOLDER " << _gfxlab_texture_dir << " dos not exist\n";
         assert(0);
     }
 }
 
-void SceneParser::Parse(const char* file)
+WindowPtr SceneParser::Parse(const char* file)
 {
     SetResourceLocations();
 
@@ -100,26 +110,17 @@ void SceneParser::Parse(const char* file)
         std::cout << "failed to open " << file << std::endl;
         std::exit(-1);
     }
-    try {
-        input >> _j;
-
-        LOGINFO("Parsing attribute 'Window'...\n");
-        auto window = ParseWindow();
-        _renderer = ParseRenderer();
-        ParseTextures();
-        ParsePrograms();
-        SetRenderStates();
-        auto scene = ParseScene();
-        if (scene != nullptr)
-            _renderer->SetScene(scene);
-        ParseStateCallbacks();
-        ParseRenderPass();
-        window->SetRenderer(_renderer);
-        window->Display();
-    }
-    catch (std::exception& e) {
-        LOGERR("%s\n", e.what());
-    }
+  
+    input >> _j;
+    auto window = ParseWindow();
+    _renderer = ParseRenderer();
+    auto scene = ParseScene();
+    if (scene != nullptr)
+        _renderer->SetScene(scene);
+    ParseStateCallbacks();
+    ParseRenderPasses();
+    window->SetRenderer(_renderer);
+    return window;
 }
 
 WindowPtr SceneParser::ParseWindow()
@@ -128,6 +129,8 @@ WindowPtr SceneParser::ParseWindow()
     _width = Window::WIDTH;
     _height = Window::HEIGHT;
     title = Window::TITLE;
+
+    LOGINFO("Parsing attribute 'Window'...\n");
 
     if (_j.find("Window") != _j.end() ) {
         if (_j["Window"].is_object()) {
@@ -141,7 +144,7 @@ WindowPtr SceneParser::ParseWindow()
         }
     }
 
-    return std::unique_ptr<Window>(Window::Create(title.c_str(), _width, _height));
+    return std::shared_ptr<Window>(Window::Create(title.c_str(), _width, _height));
 }
 
 ScenePtr SceneParser::ParseScene()
@@ -152,18 +155,26 @@ ScenePtr SceneParser::ParseScene()
             LOGINFO("Parsing attribute 'Scene'...\n");
             auto scene_object = _j["Scene"];
             scene.reset(new Scene());
-            if (scene_object.find("Camera") != scene_object.end()) {
-                if (scene_object["Camera"].is_object())
-                    ParseCamera(scene, scene_object["Camera"]);
+            if (scene_object.find("camera") != scene_object.end()) {
+                if (scene_object["camera"].is_object())
+                    ParseCamera(scene, scene_object["camera"]);
                 else
-                    LOGERR("Expects a JSON object for the attribute Scene.Camera\n");
+                    LOGERR("Expects a JSON object for the attribute Scene.camera\n");
+            }
+            else {
+                CameraPtr cam = std::make_shared<Camera>(0, 0, _width, _height);
+                cam->LookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                scene->SetCamera(cam);
             }
 
-            if (scene_object.find("Geometries") != scene_object.end()) {
-                if (scene_object["Geometries"].is_array())
-                    ParseGeometries(scene, scene_object["Geometries"]);
+            if (scene_object.find("geometries") != scene_object.end()) {
+                if (scene_object["geometries"].is_array())
+                    ParseGeometries(scene, scene_object["geometries"]);
                 else
-                    LOGERR("Expects a JSON array for the attribute Scene.Geometries\n");
+                    LOGERR("Expects a JSON array for the attribute Scene.geometries!\n");
+            }
+            else {
+                LOGINFO("No geometries are added to the scene!\n")
             }
 
             if (scene_object.find("Lights") != scene_object.end()) {
@@ -198,8 +209,10 @@ void SceneParser::ParseCamera(ScenePtr scene, const json& cam_settings)
 void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
 {
     LOGINFO("Parsing attribute 'Scene.Geometries'...\n");
+    if (geom_settings.size() == 0)
+        LOGINFO("No geometries are added to the scene!\n");
     
-    std::string attib_full_name, source, program, id;
+    std::string attib_full_name, source, id, tex;
     int geom_id = 0;
     for (auto& geom : geom_settings) {
         GeometryPtr mesh = std::shared_ptr<Geometry>(new Mesh);
@@ -207,12 +220,18 @@ void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
         ProcessStringAttrib(geom, "name", attib_full_name + "name", true, id);
         mesh->SetName(id);
 
-        ProcessStringAttrib(geom, "source", attib_full_name+"source", true, source);
-        source = _gfxlab_model_dir + "/" + source;
-        _resmanager->LoadMesh(source, std::static_pointer_cast<Mesh>(mesh));
+        source = _gfxlab_model_dir + "/" + id;
+        ResourceManager::GetInstance()->LoadMesh(source, std::static_pointer_cast<Mesh>(mesh));
 
         _geometries[id] = mesh;
         scene->AddGeometry(mesh);
+
+        ProcessStringAttrib(geom, "texture", attib_full_name + "texture", false, tex);
+        if (!tex.empty()) {
+            source = _gfxlab_texture_dir + "/" + tex;
+            GLuint tex_id = ResourceManager::GetInstance()->LoadTexture("2D", source);
+            mesh->SetTexture(GL_TEXTURE_2D, tex_id);
+        }
     }
 }
 
@@ -266,83 +285,21 @@ void SceneParser::ParseLights(ScenePtr scene, const json& light_settings)
         ++light_id;
 
         scene->AddLight(l);
-        
     }
-
 }
 
 RendererPtr SceneParser::ParseRenderer()
 {
-    LOGINFO("Parsing attribute 'Renderer'...\n");
-
     std::string renderer_name = "default";
     if (_j.find("Renderer") == _j.end()) {
-        LOGINFO("Use default renderer since Renderer is not set.\n");
+        LOGINFO("Use default renderer.\n");
     }
     else {
+        LOGINFO("Parsing attribute 'Renderer'...\n");
         ProcessStringAttrib(_j, "Renderer", "Renderer", true, renderer_name);
     }
     
     return RendererFactory::MakeRenderer(renderer_name);
-}
-
-void SceneParser::ParseTextures()
-{
-    LOGINFO("Parsing attribute 'Textures'...\n");
-
-    if (_j.find("Textures") != _j.end()) {
-        if (_j["Textures"].is_array()) {
-            auto textures = _j["Textures"].get<std::vector<json>>();
-            int tex_id = 0;
-            std::string tex_name, tex_type, tex_file;
-            for (auto& tex : textures) {
-                std::string attrib_full_name = "Textures[" + std::to_string(tex_id) + "].";
-                ProcessStringAttrib(tex, "name", attrib_full_name+"name", true, tex_name);
-                ProcessStringAttrib(tex, "type", attrib_full_name + "type", true, tex_type);
-                ProcessStringAttrib(tex, "source", attrib_full_name + "source", true, tex_file);
-                ++tex_id;
-
-                _textures[tex_name] =  _resmanager->LoadTexture(tex_type, tex_file);
-            }
-        }
-        else {
-            LOGERR("Expects a JSON array for the attribute 'Textures'\n");
-        }
-    }
-}
-
-void SceneParser::ParsePrograms()
-{
-    LOGINFO("Parsing attribute 'Programs'...\n");
-
-    if (_j.find("Programs") != _j.end()) {
-        if (_j["Programs"].is_array()) {
-            auto programs = _j["Programs"];
-            std::string prog_name, shaders;
-            int prog_id = 0;
-            for (auto& prog : programs) {
-                std::string attrib_full_name = "Programs[" + std::to_string(prog_id) + "].";
-                ProcessStringAttrib(prog, "name", attrib_full_name + "name", true, prog_name);
-                ProcessStringAttrib(prog, "shaders", attrib_full_name + "shaders", true, shaders);
-                ++prog_id;
-
-                std::vector<std::string> shader_files;
-                size_t prev = 0, next;
-                while ((next = shaders.find_first_of(";", prev)) != std::string::npos) {
-                    shader_files.push_back(_gfxlab_shader_dir + "/" + shaders.substr(prev, next - prev));
-                    next++;
-                    while (std::isspace(shaders[next]))
-                        next++;
-                    prev = next;
-                }
-                shader_files.push_back(_gfxlab_shader_dir + "/" + shaders.substr(prev));
-                _programs[prog_name] = _resmanager->CreateProgram(shader_files);
-            }
-        }
-        else {
-            LOGERR("Expects a JSON array for the attribute 'Programs'\n");
-        }
-    }
 }
 
 void SceneParser::ParseStateCallbacks()
@@ -396,91 +353,281 @@ void SceneParser::ParseStateCallbacks()
             if (geom_cb != nullptr)
                 _renderer->SetGeometrySetStateCallback(reinterpret_cast<void(*)(const GeometryPtr&, ProgramRenderStates&)>(geom_cb));
         }
-        
+    }
+    else {
+        LOGINFO("No DLL found for setting rendering states\n");
     }
 }
 
-void SceneParser::ParseRenderPass()
+void SceneParser::ParseRenderPasses()
 {
-    LOGINFO("Parsing attribute 'RenderPasses'...\n");
-
     if (_j.find("RenderPasses") != _j.end()) {
+        LOGINFO("Parsing attribute 'RenderPasses'...\n");
+
         if (_j["RenderPasses"].is_array()) {
             auto render_passes = _j["RenderPasses"];
             int rp_counter = 0;
-            for (auto& rp : render_passes) {
-                std::string attrib_full_name = "RenderPasses[" + std::to_string(rp_counter) + "]";
-
-                if (rp.is_array()) {
-                    std::string program;
-                    GLuint prog_id;
-                    std::vector<std::string> geometry_strings;
-                    int pair_counter = 0;
-                    for (auto& prog_geoms : rp) {
-                        attrib_full_name += "[" + std::to_string(pair_counter) + "].";
-                        ProcessStringAttrib(prog_geoms, "program", attrib_full_name + "program", true, program);
-                        ProcessStringArrayAttrib(prog_geoms, "geometries", attrib_full_name + "geometries", true, geometry_strings);
-
-                        prog_id = _programs[program];
-                        std::vector<GeometryPtr> geometries;
-                        for (auto& g_name : geometry_strings) {
-                            if (_geometries.find(g_name) == _geometries.end()) {
-                                LOGERR("Failed to find geometry '%s' in  %s\n", g_name.c_str(), (attrib_full_name + "geometries").c_str());
-                            }
-                            else {
-                                GeometryPtr geom = _geometries[g_name];
-                                geometries.push_back(geom);
-                            }
-                        }
-
-                        if (!_geometries.empty()) {
-                            RenderPassPtr render_pass = std::make_unique<RenderPass>(_renderer);
-                            render_pass->SetProgramForGeometries(prog_id, geometries);
-                            _renderer->AddRenderPass(std::move(render_pass));
-                        }
-                        else {
-                            LOGINFO("No geometries found for render pass %d\n", rp_counter);
-                        }
-
-                        pair_counter++;
-                    }
-                }
-                else {
-                    LOGERR("Expects a JSON array for the attribute RenderPasses[%d]\n", rp_counter);
-                }
-                rp_counter++;
-            }
+            for (auto& rp : render_passes)
+                ParseSingleRenderPass(rp, rp_counter++);
         }
         else {
             LOGERR("Expects a JSON array for the attribute 'RenderPasses'\n");
         }
     }
     else {
+        LOGERR("No renderpass is found!\n");
+    }
+}
 
-        if (_programs.empty())
-            LOGERR("Failed to create default render pass because no program is found\n");
+void SceneParser::ParseSingleRenderPass(const json& rp, int rp_counter)
+{
+    std::string attrib_full_name = "RenderPasses[" + std::to_string(rp_counter) + "]";
 
-        GLuint prog_id = _programs.begin()->second;
+   
+    if (rp.is_object()) {
+        RenderPassPtr render_pass = std::make_unique<RenderPass>(_renderer);
+        
+        GLuint prog_id = ParseProgramInRenderPass(rp, attrib_full_name);
+
         std::vector<GeometryPtr> geometries;
-        for (auto& kv : _geometries)
-            geometries.push_back(kv.second);
-
-        if (!geometries.empty()) {
-            RenderPassPtr render_pass = std::make_unique<RenderPass>(_renderer);
+        ParseGeometriesInRenderPass(rp, attrib_full_name, geometries);
+        if (geometries.empty())
+            render_pass->SetProgram(prog_id);
+        else
             render_pass->SetProgramForGeometries(prog_id, geometries);
-            _renderer->AddRenderPass(std::move(render_pass));
+
+        if (rp.find("fbo") != rp.end()) {
+            std::vector<std::pair<GLuint, GLenum>> color_attachments;
+            std::pair<GLuint, GLenum>              depth_attachment;
+            std::pair<GLuint, GLenum>              stencil_attachment;
+            std::pair<GLuint, GLenum>              ds_attachment;
+
+            ParseFBOAttachmentsInRenderPass(rp["fbo"], color_attachments, depth_attachment, stencil_attachment, ds_attachment, attrib_full_name);
+            bool success = render_pass->CreateFBO(color_attachments, depth_attachment, stencil_attachment, ds_attachment);
+            if (!success) {
+                LOGERR("Failed to create FBO for %s\n", attrib_full_name.c_str());
+            }
+            RecordFBOInfoForRenderPass(rp_counter, color_attachments, depth_attachment, stencil_attachment, ds_attachment);
+        }
+
+        if (rp.find("textures") != rp.end()) {
+            std::vector<GLuint> textures;
+            ParseInputTextures(rp, rp_counter, textures);
+            render_pass->SetInputTextures(textures);
+        }
+
+        if (rp.find("show_image") != rp.end()) {
+            std::string tex_name;
+            ProcessStringAttrib(rp, "show_image", attrib_full_name + ".show_image", true, tex_name);
+            GLuint tex_id = GetTextureObj(tex_name);
+            assert(tex_id != 0);
+            render_pass->SetDisplayImage(tex_id);
+        }
+            
+        _renderer->AddRenderPass(std::move(render_pass));
+    }
+    else {
+        LOGERR("Expects a JSON object for the attribute RenderPasses[%d]\n", rp_counter);
+    }
+}
+
+GLuint SceneParser::ParseProgramInRenderPass(const json& rp, const std::string& attrib_full_name)
+{
+    GLuint prog_id;
+    if (rp.find("program") != rp.end()) {
+        std::string prog_name, shaders;
+
+        ProcessStringAttrib(rp["program"], "name", attrib_full_name + "name", true, prog_name);
+        ProcessStringAttrib(rp["program"], "shaders", attrib_full_name + "shaders", true, shaders);
+
+        if (_programs.find(prog_name) == _programs.end()) {
+            std::vector<std::string> shader_files;
+            CollectShaderFiles(shaders, shader_files);
+            prog_id = ResourceManager::GetInstance()->CreateProgram(shader_files);
+            assert(prog_id != 0);
+            _renderer->AddShaderProgram(prog_name, prog_id);
+            _programs[prog_name] = prog_id;
         }
         else {
-            LOGINFO("No geometries found for default render pass\n");
+            prog_id = _programs[prog_name];
+        }
+        return prog_id;
+    }
+    else {
+        LOGERR("Attribute 'program' not found in %s!\n", attrib_full_name.c_str());
+    }
+}
+
+void SceneParser::ParseGeometriesInRenderPass(const json& rp, const std::string attrib_full_name, std::vector<GeometryPtr>& geometries)
+{
+    std::vector<std::string> geom_names;
+    ProcessStringArrayAttrib(rp, "geometries", attrib_full_name + ".geometries", false, geom_names);
+    for (auto& name : geom_names)
+        geometries.push_back(_geometries[name]);
+}
+
+void SceneParser::RecordFBOInfoForRenderPass(GLuint fbo,
+    std::vector<std::pair<GLuint, GLenum>>& color_attachments,
+    std::pair<GLuint, GLenum>& depth_attachment,
+    std::pair<GLuint, GLenum>& stencil_attachment,
+    std::pair<GLuint, GLenum>& ds_attachment)
+{
+    FBOAttachments info;
+    memset(&info, 0, sizeof(FBOAttachments));
+
+    for (auto& color : color_attachments)
+        info.color.push_back(color.first);
+    
+    info.depth = depth_attachment.first;
+    info.stencil = stencil_attachment.first;
+    info.depth_stencil = ds_attachment.first;
+
+    _fboAttachments[fbo] = info;
+}
+
+void SceneParser::ParseFBOAttachmentsInRenderPass(const json& fbo,
+                                      std::vector<std::pair<GLuint, GLenum>>& color_attachments,
+                                      std::pair<GLuint, GLenum>& depth_attachment,
+                                      std::pair<GLuint, GLenum>& stencil_attachment,
+                                      std::pair<GLuint, GLenum>& ds_attachment,
+                                      const std::string& rp_name)
+{
+    GLint max_color_attachments;
+    glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_color_attachments);
+
+    std::string full_attrib_name = rp_name + ".fbo.";
+    std::string color_attachment_name;
+    FBOInfo fbo_info;
+    for (GLint i = 0; i < max_color_attachments; i++) {
+        color_attachment_name = "color" + std::to_string(i);
+        if (fbo.find(color_attachment_name) != fbo.end()) {
+            fbo_info = CreateFBOAttachment(fbo[color_attachment_name], "color", full_attrib_name + color_attachment_name);
+            color_attachments.push_back(std::make_pair(fbo_info.first, fbo_info.second));
+        }
+        else {
+            break;
         }
     }
 
+    if (fbo.find("depth") != fbo.end()) {
+        depth_attachment = CreateFBOAttachment(fbo["depth"], "depth", full_attrib_name + "depth");
+    }
+   
+    if (fbo.find("depth_stencil") != fbo.end()) {
+        ds_attachment = CreateFBOAttachment(fbo["depth_stencil"], "depth_stencil", full_attrib_name + "depth_stencil");
+    }
+
+    if (fbo.find("stencil") != fbo.end()) {
+        stencil_attachment = CreateFBOAttachment(fbo["stencil"], "stencil", full_attrib_name + "stencil");
+    }
 }
 
-void SceneParser::SetRenderStates()
+FBOInfo SceneParser::CreateFBOAttachment(const json& attachment, const std::string& type, const std::string& full_attrib_name)
 {
-    for (auto& kv : _programs)
-        _renderer->AddShaderProgram(kv.first, kv.second);
+    const static int TEXTURE = 0;
+    const static int RENDERBUFFER = 1;
+
+    GLsizei width, height;
+    width = _width;
+    height = _height;
+
+    GLenum attachment_type = GL_TEXTURE_2D;
+    std::string type_str;
+    ProcessStringAttrib(attachment, "type", "type", false, type_str);
+    if (!type_str.empty()) {
+        if (type_str == "render buffer")
+            attachment_type = GL_RENDERBUFFER;
+        else if (type_str == "texture")
+            attachment_type = GL_TEXTURE_2D;
+        else
+            LOGERR("%s: unsupported FBO attachment type: %s. Must be either 'render buffer' or 'texture'\n",
+                full_attrib_name.c_str(),
+                type_str.c_str());
+    }
+
+    std::vector<float> dimension;
+    ProcessNumberArrayAttrib(attachment, "dimension", "dimension", false, dimension);
+    if (!dimension.empty()) {
+        if (dimension.size() == 2) {
+            width = (GLsizei)dimension[0];
+            height = (GLsizei)dimension[1];
+        }
+        else {
+            LOGERR("The 'dimension' attribute of a FBO attachment must be an array of size 2\n")
+        }
+    }
+
+    GLuint id;
+    if (attachment_type == GL_TEXTURE_2D) {
+        id = ResourceManager::GetInstance()->CreateTexture(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE);
+    }
+    else {
+        GLenum format;
+        if (type == "depth")
+            format = GL_DEPTH_COMPONENT;
+        else if (type == "stencil")
+            format = GL_STENCIL_INDEX;
+        else
+            format = GL_DEPTH24_STENCIL8;
+        id = ResourceManager::GetInstance()->CreateRenderBuffer(GL_RENDERBUFFER, format, width, height);
+    }
+
+    return std::make_pair(id, attachment_type);
+}
+
+
+void SceneParser::ParseInputTextures(const json& textures, int rp, std::vector<GLuint>& tex_objs)
+{
+    std::vector<std::string> str_textures;
+    std::string full_name = "RenderPasses[" + std::to_string(rp) + "].textures";
+    ProcessStringArrayAttrib(textures, "textures", full_name, false, str_textures);
+
+    for (auto& tex_name : str_textures) {
+        GLuint tex_id = GetTextureObj(tex_name);
+        if (tex_id != 0) {
+            tex_objs.push_back(tex_id);
+        }
+        else {
+            LOGERR("%s does not exist\n", tex_name.c_str());
+        }
+    }
+}
+
+GLuint SceneParser::GetTextureObj(const std::string& tex_name)
+{
+    std::regex pattern("fbo[0-9]+\\.(color[0-9]+|depth|stencil|ds)");
+    GLuint tex_id = 0;
+
+    if (std::regex_match(tex_name, pattern)) {
+        size_t dot_pos = tex_name.find_first_of('.');
+        std::string fbo_id_str = tex_name.substr(3, dot_pos + 1);
+        GLuint fbo_id = std::atoi(fbo_id_str.c_str());
+        if (_fboAttachments.find(fbo_id) != _fboAttachments.end()) {
+            FBOAttachments fbo_info = _fboAttachments[fbo_id];
+
+            if (tex_name.find("color") != std::string::npos) {
+                std::string color_idx_str = tex_name.substr(dot_pos + strlen("color") + 1);
+                int color_idx = std::atoi(color_idx_str.c_str());
+                assert(color_idx < fbo_info.color.size() && fbo_info.color[color_idx] > 0);
+                tex_id = fbo_info.color[color_idx];
+            }
+            else if (tex_name.find("depth") != std::string::npos) {
+                tex_id = fbo_info.depth;
+            }
+            else if (tex_name.find("stencil") != std::string::npos) {
+                tex_id = fbo_info.stencil;
+            }
+            else if (tex_name.find("ds") != std::string::npos) {
+                tex_id = fbo_info.depth_stencil;
+            }
+        }
+    }
+    else {
+        std::string  source = _gfxlab_texture_dir + "/" + tex_name;
+        tex_id = ResourceManager::GetInstance()->LoadTexture("2D", source);
+    }
+
+    return  tex_id;
 }
 
 
@@ -583,4 +730,19 @@ bool SceneParser::ValidFolder(const std::string& folder)
     struct stat sb;
     return stat(folder.c_str(), &sb) == 0 && (sb.st_mode & S_IFDIR);
 }
+
+void SceneParser::CollectShaderFiles(const std::string& shaders, std::vector<std::string>& shader_files)
+{
+    size_t prev = 0, next;
+    while ((next = shaders.find_first_of(";", prev)) != std::string::npos) {
+        shader_files.push_back(_gfxlab_shader_dir + "/" + shaders.substr(prev, next - prev));
+        next++;
+        while (std::isspace(shaders[next]))
+            next++;
+        prev = next;
+    }
+    shader_files.push_back(_gfxlab_shader_dir + "/" + shaders.substr(prev));
+
+}
+
 

@@ -1,6 +1,7 @@
 #include "jsonparser.h"
 #include "rendererfactory.h"
 #include "renderpass.h"
+#include "window.h"
 #include <iostream>
 
 int main(int argc, char** argv)
@@ -12,7 +13,7 @@ int main(int argc, char** argv)
 
     RendererFactory::Init();
     SceneParser parser;
-    parser.Parse(argv[1]);
-
+    auto window = parser.Parse(argv[1]);
+    window->Display();
     return 0;
 }

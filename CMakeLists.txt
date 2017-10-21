@@ -32,3 +32,4 @@ endif()
 
 add_subdirectory(statecallbacks/nolight)
 add_subdirectory(statecallbacks/lighting)
+add_subdirectory(statecallbacks/postprocessing)

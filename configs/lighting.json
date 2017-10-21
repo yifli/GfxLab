@@ -3,39 +3,32 @@
     "width": 1200,
     "height": 900
   },
-  "Programs": [
-    {
-      "name": "lighting",
-      "shaders": "lighting.vs;lighting.fs"
-    },
 
-    {
-      "name": "display_normal",
-      "shaders": "display_normal.vs;display_normal.gs;display_normal.fs"
-    }
-  ],
   "SetStateCallbacks": {
     "library": "lighting.dll"
   },
+
   "Scene": {
-    "Camera": {
-      "pos": [ 0.0, 0.0, 5.0 ],
-      "focus": [ 0.0, 0.0, 0.0 ],
-      "up": [ 0.0, 1.0, 0.0 ]
-    },
-    "Geometries": [
+    "geometries": [
       {
-        "name": "cube",
-        "source": "cube.obj"
+        "name": "cube.obj"
       }
     ]
   },
+
   "RenderPasses": [
-    [
-      { "program": "lighting", "geometries": [ "cube" ] }
-    ],
-    [
-      { "program": "display_normal", "geometries": [ "cube" ] }
-    ]
+    {
+      "program": {
+        "name": "lighting",
+        "shaders": "lighting.vs;lighting.fs"
+      }
+    },
+
+    {
+      "program": {
+        "name": "display_normal",
+        "shaders": "display_normal.vs;display_normal.gs;display_normal.fs"
+      }
+    }
   ]
 }
