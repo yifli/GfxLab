@@ -14,8 +14,8 @@ void main()
 {
 	float ambient_strength = 0.1;
 	vec3 ambient = ambient_strength * light_color;
-	vec3 light_dir = light_pos - frag_pos;
-	float diffuse_strength = max(0.0, normalize(dot(light_dir, frag_normal)));
+	vec3 light_dir = normalize(light_pos - frag_pos);
+	float diffuse_strength = max(0.0, dot(light_dir, normalize(frag_normal)));
 	vec3 diffuse = diffuse_strength * light_color;
 	frag_color = vec4((ambient+diffuse) * vec3(texture(diffuse_map, frag_texcoord)), 1.0);
 }

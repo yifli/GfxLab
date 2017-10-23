@@ -24,7 +24,10 @@
         "shaders": "lightmap.vs;lightmap.fs"
       },
       "fbo": {
-        "color0": { }
+        "color0": { },
+        "depth_stencil": {
+          "type":  "render buffer"
+        }
       }
     },
     {
