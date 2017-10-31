@@ -20,6 +20,9 @@ private:
     ScenePtr    ParseScene();
     void        ParseCamera(ScenePtr, const json&);
     void        ParseGeometries(ScenePtr, const json&);
+    void        ParseGeometryInstanceData(const json&, GeometryPtr, int);
+    void        ParseGeometryInstanceDataHelper(const json&, GeometryPtr, const std::string&, void**, size_t&, size_t&);
+    void        ParseGeometryTransformation(const json&, glm::mat4&, const std::string&);
     void        ParseLights(ScenePtr, const json&);
     RendererPtr ParseRenderer();
     void        ParseStateCallbacks();

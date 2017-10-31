@@ -1,6 +1,5 @@
 #include "mesh.h"
 
-
 void Mesh::Render()
 {
     if (_texture != 0) {
@@ -8,7 +7,11 @@ void Mesh::Render()
         glBindTexture(_textureType, _texture);
     }
     glBindVertexArray(_vao);
-    glDrawElements(GL_TRIANGLES, _indices.size(), GL_UNSIGNED_INT, (GLvoid*)(0));
+    if (_numInstances)
+        glDrawElementsInstanced(GL_TRIANGLES, _indices.size(), GL_UNSIGNED_INT, (GLvoid*)(0), _numInstances);
+    else
+        glDrawElements(GL_TRIANGLES, _indices.size(), GL_UNSIGNED_INT, (GLvoid*)(0));
+
     glBindVertexArray(0);
 }
 
@@ -65,9 +68,9 @@ void Mesh::SetupVAO()
 {
     VBOInfo info;
     PopulateVBO(info);
+    CreateVBOForInstanceData();
 
 
-    GLuint index = 0;
     glGenVertexArrays(1, &_vao);
     glGenBuffers(1, &_vbo);
     glGenBuffers(1, &_ibo);
@@ -80,24 +83,45 @@ void Mesh::SetupVAO()
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, _indices.size() * sizeof(GLuint), _indices.data(), GL_STATIC_DRAW);
 
     // vertex positions
-    glEnableVertexAttribArray(index);
-    glVertexAttribPointer(index, 3, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)0);
-    index++;
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)0);
 
     // vertex normals
-    glEnableVertexAttribArray(index);
-    glVertexAttribPointer(index, 3, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)(info.normal_offset));
-    index++;
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)(info.normal_offset));
 
     if (VertexHasColorAttrib()) {
-        glEnableVertexAttribArray(index);
-        glVertexAttribPointer(index, 3, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)(info.color_offset));
-        index++;
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)(info.color_offset));
     }
 
     if (_mesh.has_vertex_texcoords2D()) {
-        glEnableVertexAttribArray(index);
-        glVertexAttribPointer(index, 2, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)(info.texcoord_offset));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, info.vertex_size, (GLvoid*)(info.texcoord_offset));
+    }
+
+    GLuint index = 4;
+    int counter = 0;
+    for (auto vbo : _instance_data_vbos) {
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        size_t total_attributes = _instanceData[counter].stride / (4 * sizeof(float));
+        if (total_attributes > 0) {
+            size_t vec4_size = sizeof(glm::vec4);
+            for (size_t i = 0; i < total_attributes; i++) {
+                glEnableVertexAttribArray(index);
+                glVertexAttribPointer(index, 4, GL_FLOAT, GL_FALSE, 4 * vec4_size, (void*)(i * vec4_size));
+                glVertexAttribDivisor(index, 1);
+                index++;
+            }
+        }
+        else {
+            glEnableVertexAttribArray(index);
+            glVertexAttribPointer(index, _instanceData[counter].stride/ sizeof(float), GL_FLOAT, GL_FALSE, _instanceData[counter].stride, (void*)(0));
+            glVertexAttribDivisor(index, 1);
+            index++;
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        counter++;
     }
 
     glBindVertexArray(0);

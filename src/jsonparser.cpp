@@ -19,6 +19,8 @@
 #include <cctype>
 #include <regex>
 
+#include <glm/gtc/type_ptr.hpp>
+
 static bool g_enable_logging = false;
 
 #define LOGINFO(fmt, ...) \
@@ -208,7 +210,7 @@ void SceneParser::ParseCamera(ScenePtr scene, const json& cam_settings)
 
 void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
 {
-    LOGINFO("Parsing attribute 'Scene.Geometries'...\n");
+    LOGINFO("Parsing attribute 'Scene.geometries'...\n");
     if (geom_settings.size() == 0)
         LOGINFO("No geometries are added to the scene!\n");
     
@@ -216,9 +218,18 @@ void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
     int geom_id = 0;
     for (auto& geom : geom_settings) {
         GeometryPtr mesh = std::shared_ptr<Geometry>(new Mesh);
-        attib_full_name = "Scene.Geometries[" + std::to_string(geom_id) + "].";
+        attib_full_name = "Scene.geometries[" + std::to_string(geom_id) + "].";
         ProcessStringAttrib(geom, "name", attib_full_name + "name", true, id);
         mesh->SetName(id);
+
+        if (geom.find("transformation") != geom.end()) {
+            glm::mat4 transformation;
+            ParseGeometryTransformation(geom["transformation"], transformation, attib_full_name);
+            mesh->ApplyTransformation(transformation);
+        }
+
+        if (geom.find("instancing") != geom.end())
+            ParseGeometryInstanceData(geom["instancing"], mesh, geom_id);
 
         source = _gfxlab_model_dir + "/" + id;
         ResourceManager::GetInstance()->LoadMesh(source, std::static_pointer_cast<Mesh>(mesh));
@@ -232,6 +243,111 @@ void SceneParser::ParseGeometries(ScenePtr scene, const json& geom_settings)
             GLuint tex_id = ResourceManager::GetInstance()->LoadTexture("2D", source);
             mesh->SetTexture(GL_TEXTURE_2D, tex_id);
         }
+    }
+}
+
+void SceneParser::ParseGeometryInstanceData(const json& instancing, GeometryPtr geom, int geom_id)
+{
+    if (instancing.is_object()) {
+        std::string full_attrib_name = "Scene.geometries[" + std::to_string(geom_id) + "].instancing.";
+        int num_instances;
+        ProcessIntAttrib(instancing, "count", full_attrib_name + "count", true, num_instances);
+        geom->SetInstanceNum(num_instances);
+
+        if (instancing.find("data") != instancing.end()) {
+            const json& data = instancing["data"];
+            auto it = data.begin();
+            static auto data_type = it.value().type();
+            for (; it != data.end(); ++it) {
+                std::string prop_name = full_attrib_name + "data." + it.key();
+
+                if (!it.value().is_array()) {
+                    LOGERR("Expects ARRARY for %s!\n", prop_name.c_str());
+                }
+
+                if (it.value().size() != num_instances) {
+                    LOGERR("The length of array %s must be %d!\n", prop_name.c_str(), num_instances);
+                }
+
+                if (it.value().type() != data_type) {
+                    LOGERR("%s contains incompatible data!", prop_name.c_str());
+                }
+
+                void* data;
+                size_t size, stride;
+                ParseGeometryInstanceDataHelper(it.value(), geom, prop_name, &data, size, stride);
+                geom->SetInstanceData(data, size, stride);
+            }
+        }
+        else {
+            LOGERR("Attribute %s is missing!\n", (full_attrib_name + "data").c_str());
+        }
+    }
+    else {
+        LOGERR("Expects a JSON object for Scene.geometries[%d].instancing!\n", geom_id);
+    }
+}
+
+void SceneParser::ParseGeometryInstanceDataHelper(const json& data_agrregate, GeometryPtr geom,
+    const std::string& attrib_name, void** data, size_t& size, size_t& stride)
+{
+    *data = malloc(data_agrregate.size() * 16 * sizeof(float));
+    
+    if (data_agrregate[0].is_object()) {
+        stride = 16 * sizeof(float);
+    }
+    else if (data_agrregate[0].is_array()) {
+        size_t arr_len = data_agrregate[0][0].size();
+        assert(arr_len == 1 || arr_len == 2 || arr_len == 3 || arr_len == 4);
+        stride = arr_len * sizeof(float);
+    }
+    else if (data_agrregate[0].is_number()) {
+        stride = sizeof(float);
+        size = sizeof(float) * data_agrregate.size();
+        memcpy(*data, data_agrregate.get<std::vector<float>>().data(), size);
+    }
+    else
+        assert(0);
+
+    uint32_t counter = 0;
+    size = 0;
+    for (auto& data_item : data_agrregate) {
+        std::string full_attrib_name = attrib_name + "[" + std::to_string(counter) + "].";
+        if (data_item.is_object()) {
+            glm::mat4 transformation;
+            ParseGeometryTransformation(data_item, transformation, full_attrib_name);
+            size += stride;
+            memcpy((char*)(*data) + stride * counter, glm::value_ptr(transformation), stride);
+        }
+        else if (data_item.is_array()) {
+            static size_t vec_len = data_item.size() * sizeof(float);
+            size + stride;
+            memcpy((char*)(*data) + stride * counter, data_item.get<std::vector<float>>().data(), stride);
+        }
+        counter++;
+    }
+}
+
+void SceneParser::ParseGeometryTransformation(const json& trans, glm::mat4& transformation, const std::string& attrib_name)
+{
+    if (trans.find("translation") != trans.end()) {
+        std::vector<float> trans_param;
+        ProcessNumberArrayAttrib(trans, "translation", attrib_name + "translation", true, trans_param);
+        assert(trans_param.size() == 3);
+        transformation = glm::translate(transformation, glm::vec3(trans_param[0], trans_param[1], trans_param[2]));
+    }
+
+    if (trans.find("scale") != trans.end()) {
+        std::vector<float> scale_param;
+        ProcessNumberArrayAttrib(trans, "scale", attrib_name + "scale", true, scale_param);
+        assert(scale_param.size() == 3);
+        transformation = glm::scale(transformation, glm::vec3(scale_param[0], scale_param[1], scale_param[2]));
+    }
+
+    if (trans.find("rotation") != trans.end()) {
+        std::vector<float> rotate_param;
+        ProcessNumberArrayAttrib(trans, "rotation", attrib_name + "rotation", true, rotate_param);
+        transformation = glm::rotate(transformation, rotate_param[3], glm::vec3(rotate_param[0], rotate_param[1], rotate_param[2]));
     }
 }
 
